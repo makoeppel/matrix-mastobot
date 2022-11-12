@@ -4,8 +4,7 @@ Matrix Bot written in python using [mastodon.py](https://github.com/halcy/Mastod
 
 The main idea is to create a full mastodon integration of the timeline via a Matrix Bot. For now the DM functions are not scheduled.
 
-(uncomplete) Feature list:
---------------------------
+## (uncomplete) Feature list:
 - Basic Functions:
     - [x] getting timeline from mastodon via mastodon.py
     - [x] showing last timeline entry on local flask server
@@ -33,7 +32,6 @@ The main idea is to create a full mastodon integration of the timeline via a Mat
     - [] Create simple docker container
     - [] Integrate into [matrix-docker-ansible-deploy](https://github.com/spantaleev/matrix-docker-ansible-deploy)
 
-# Buy me a coffee
+## Buy me a coffee
 
-## PayPal
 [paypal](https://www.paypal.me/makoeppel/)
