@@ -1,0 +1,4 @@
+PyYAML==6.0
+Mastodon.py==1.5.2
+Flask==2.2.2
+simplematrixbotlib==2.8.0

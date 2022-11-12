@@ -1,0 +1,6 @@
+.cache/*
+store/*
+*.secret
+config.yml
+session.txt
+*/__pycache__/*

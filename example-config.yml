@@ -1,0 +1,17 @@
+# example file for matrix-mastobot
+
+# place all your user information from mastodon here
+mastodon-user:
+  user_name: "USERNAME"                   # your mastodon user name (change me)
+  user_mail: "USERMAIL"                   # your mastodon user mail (change me)
+  user_password: "USERPW"                 # the super strong password you use (change me)
+  api_base_url: "MASTODONURL"             # base URL to your mastodon server (change me)
+  secret: "pytooter_clientcred.secret"    # shared secret from your mastodon APP (no change)
+  token: "pytooter_usercred.secret"       # shared token from your mastodon user (no change)
+
+
+# specifi matrix stettings
+matrix:
+  bot_user: "BOTNAME"                     # name of the bot which you invite into your matrix room (change me)
+  bot_password: "BOTPW"                   # the super strong password you use for your bot user (change me)
+  matrix_url: "MATRIXSERVER"              # URL of your matrix server
