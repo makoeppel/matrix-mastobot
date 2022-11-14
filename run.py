@@ -1,13 +1,17 @@
+"""
+    Run file for the mastobot
+"""
+
 import yaml
-from src.bot import mastobot
+from src.bot import Mastobot
 
 
 # open the config file
-with open('config.yml', 'r') as file:
+with open('config.yml', 'r', encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 # create mastobot instance
-mastobot = mastobot(config)
+mastobot = Mastobot(config)
 
 # connect to mastodon
 mastobot.connect_mastodon()

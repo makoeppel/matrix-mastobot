@@ -1,17 +1,16 @@
-from mastodon import Mastodon
-from flask import Flask
-from util.helpers import *
+"""
+    Class file for the mastobot
+"""
+
 import os
 import simplematrixbotlib as botlib
 
-import subprocess
-import datetime
-
-from urllib.request import ssl, socket
-import datetime, smtplib
+from mastodon import Mastodon
+from flask import Flask
+from util.helpers import save_json, load_json
 
 
-class mastobot:
+class Mastobot:
     """
         Bot class to connect to mastodon instance
         and forward timeline to matrix server.
@@ -21,12 +20,25 @@ class mastobot:
         self.path = path
         self._setup()
 
+        # default values
+        self.timeline_home = None
+        self.timeline_local = None
+        self.timeline_public = None
+        self.mastodon = None
+        self.mastobot = None
+
     def _setup(self):
+        """
+            Create .cache folder
+        """
         # create cache folder if it's not there
         if not os.path.exists(self.path):
             os.mkdir(self.path)
 
     def connect_mastodon(self):
+        """
+            Create app connection to mastodon
+        """
         # check if file pytooter_clientcred.secret exists
         # otherwise register the APP
         if not os.path.exists(self.config["mastodon-user"]["secret"]):
@@ -55,9 +67,9 @@ class mastobot:
 
     def load_timelines(self, timeline="", reload=False):
         """
-            load all timelines (most recent ones first). 
-            The function can load the 'home', 'local', 'public' 
-            timesline via "" into the class attributes or return a 
+            load all timelines (most recent ones first).
+            The function can load the 'home', 'local', 'public'
+            timesline via "" into the class attributes or return a
             specific one using 'home', 'local', 'public', 'tag/hashtag' or 'list/id'
         """
         # load all timelines and store in the class
@@ -81,7 +93,9 @@ class mastobot:
                 self._log_in()
                 self.timeline_public = self.mastodon.timeline_public()
                 save_json(self.path + "timeline_public.json", self.timeline_public)
-            self.timeline_public = self._sort_timeline(load_json(self.path + "timeline_public.json"))
+            self.timeline_public = self._sort_timeline(
+                load_json(self.path + "timeline_public.json")
+            )
 
         # load a specific timeline
         if timeline != "":
@@ -89,25 +103,34 @@ class mastobot:
             if timeline == "home":
                 self.timeline_home = self.mastodon.timeline(timeline=timeline)
                 save_json(self.path + "timeline_home.json", self.timeline_home)
-                self.timeline_home = self._sort_timeline(load_json(self.path + "timeline_home.json"))
+                self.timeline_home = self._sort_timeline(
+                    load_json(self.path + "timeline_home.json")
+                )
             if timeline == "local":
                 self.timeline_local = self.mastodon.timeline(timeline=timeline)
                 save_json(self.path + "timeline_local.json", self.timeline_local)
-                self.timeline_local = self._sort_timeline(load_json(self.path + "timeline_local.json"))
+                self.timeline_local = self._sort_timeline(
+                    load_json(self.path + "timeline_local.json")
+                )
             if timeline == "public":
                 self.timeline_public = self.mastodon.timeline(timeline=timeline)
                 save_json(self.path + "timeline_public.json", self.timeline_public)
-                self.timeline_public = self._sort_timeline(load_json(self.path + "timeline_public.json"))
+                self.timeline_public = self._sort_timeline(
+                    load_json(self.path + "timeline_public.json")
+                )
 
     def _sort_timeline(self, timeline):
         """
             Function to sort the timeline by created_at
         """
-        createdList = []
+        created_list = []
         for toot in timeline:
-            createdList.append(toot["created_at"].split(".")[0])
+            created_list.append(toot["created_at"].split(".")[0])
 
-        _, timeline = (list(x) for x in zip(*sorted(zip(createdList, timeline), key=lambda pair: pair[0])))
+        _, timeline = (list(x) for x in zip(*sorted(
+            zip(created_list, timeline),
+            key=lambda pair: pair[0]
+        )))
 
         return timeline
 
@@ -115,14 +138,14 @@ class mastobot:
         """
             Function to clear local cache / logging of bot
         """
-        pass
+        raise NotImplementedError(self.__class__.__name__ + '._clear_cache_folder()')
 
     def _search_mastodon(self, query=""):
         """
             Function to handle search request to mastodon
             using mastodon.search(query)
         """
-        pass
+        raise NotImplementedError(self.__class__.__name__ + '._search_mastodon()')
 
     def run_flask(self):
         """
@@ -185,12 +208,12 @@ Media{i}: {media["preview_url"]}
         self.mastobot = botlib.Bot(creds, config)
 
         # prefix for the bot
-        PREFIX = "!"
+        prefix = "!"
 
         # Help
         @self.mastobot.listener.on_message_event
-        async def help(room, message):
-            match = botlib.MessageMatch(room, message, self.mastobot, PREFIX)
+        async def print_help(room, message):
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("help"):
                 help_message = """
                 Help:
@@ -206,40 +229,42 @@ Media{i}: {media["preview_url"]}
         # get local mastodon timeline
         @self.mastobot.listener.on_message_event
         async def local(room, message):
-            match = botlib.MessageMatch(room, message, self.mastobot, PREFIX)
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("local"):
                 await self.mastobot.api.send_markdown_message(
-                    room.room_id, 
+                    room.room_id,
                     self._convert_to_markdown(self.timeline_local)
                 )
 
         # get home mastodon timeline
         @self.mastobot.listener.on_message_event
         async def home(room, message):
-            match = botlib.MessageMatch(room, message, self.mastobot, PREFIX)
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("home"):
                 await self.mastobot.api.send_markdown_message(
-                    room.room_id, 
+                    room.room_id,
                     self._convert_to_markdown(self.timeline_home)
                 )
 
         # get public mastodon timeline
         @self.mastobot.listener.on_message_event
         async def public(room, message):
-            match = botlib.MessageMatch(room, message, self.mastobot, PREFIX)
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("public"):
                 await self.mastobot.api.send_markdown_message(
-                    room.room_id, 
+                    room.room_id,
                     self._convert_to_markdown(self.timeline_public)
                 )
 
         # reload mastodon timelines
         @self.mastobot.listener.on_message_event
         async def reload(room, message):
-            match = botlib.MessageMatch(room, message, self.mastobot, PREFIX)
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("reload"):
                 self.load_timelines(reload=True)
-                await self.mastobot.api.send_text_message(room.room_id, "I have reloaded your timelines for you.")
+                await self.mastobot.api.send_text_message(
+                    room.room_id, "I have reloaded your timelines for you."
+                )
 
         # Echo
         @self.mastobot.listener.on_message_event
@@ -250,10 +275,16 @@ Media{i}: {media["preview_url"]}
             user:  !echo say something
             bot:   say something
             """
-            match = botlib.MessageMatch(room, message, self.mastobot, PREFIX)
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("echo"):
-                print("Room: {r}, User: {u}, Message: {m}".format(r=room.room_id, u=str(message).split(':')[0], m=str(message).split(':')[-1].strip()))
-                await self.mastobot.api.send_text_message(room.room_id, " ".join(arg for arg in match.args()))
+                print(f"Room: {room.room_id}, \
+                        User: {str(message).split(':', maxsplit=None)[0]}, \
+                        Message: {str(message).split(':', maxsplit=None)[-1].strip()}"
+                )
+                await self.mastobot.api.send_text_message(
+                    room.room_id,
+                    " ".join(arg for arg in match.args())
+                )
 
         # run the bot
         self.mastobot.run()
