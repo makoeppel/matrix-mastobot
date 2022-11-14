@@ -2,12 +2,13 @@ from mastodon import Mastodon
 from flask import Flask
 from util.helpers import *
 import os
+import simplematrixbotlib as botlib
 
 import subprocess
-import simplematrixbotlib as botlib
+import datetime
+
 from urllib.request import ssl, socket
 import datetime, smtplib
-
 
 
 class mastobot:
@@ -41,6 +42,9 @@ class mastobot:
             api_base_url = self.config["mastodon-user"]["api_base_url"]
         )
 
+        self._log_in()
+
+    def _log_in(self):
         # login to your mastodon server
         # and get the user token
         self.mastodon.log_in(
@@ -59,31 +63,53 @@ class mastobot:
         # load all timelines and store in the class
         if timeline == "":
             # handle home timeline
-            if os.path.exists(self.path + "timeline_home.json") and not reload:
-                self.timeline_home = load_json(self.path + "timeline_home.json")
             if not os.path.exists(self.path + "timeline_home.json") or reload:
+                self._log_in()
                 self.timeline_home = self.mastodon.timeline_home()
                 save_json(self.path + "timeline_home.json", self.timeline_home)
+            self.timeline_home = self._sort_timeline(load_json(self.path + "timeline_home.json"))
 
             # handle local timeline
-            if os.path.exists(self.path + "timeline_local.json") and not reload:
-                self.timeline_local = load_json(self.path + "timeline_local.json")
             if not os.path.exists(self.path + "timeline_local.json") or reload:
+                self._log_in()
                 self.timeline_local = self.mastodon.timeline_local()
                 save_json(self.path + "timeline_local.json", self.timeline_local)
+            self.timeline_local = self._sort_timeline(load_json(self.path + "timeline_local.json"))
 
             # handle public timeline
-            if os.path.exists(self.path + "timeline_public.json") and not reload:
-                self.timeline_public = load_json(self.path + "timeline_public.json")
             if not os.path.exists(self.path + "timeline_public.json") or reload:
+                self._log_in()
                 self.timeline_public = self.mastodon.timeline_public()
                 save_json(self.path + "timeline_public.json", self.timeline_public)
-        
-        print("Done")
+            self.timeline_public = self._sort_timeline(load_json(self.path + "timeline_public.json"))
 
         # load a specific timeline
         if timeline != "":
-            return self.mastodon.timeline(timeline=timeline)
+            self._log_in()
+            if timeline == "home":
+                self.timeline_home = self.mastodon.timeline(timeline=timeline)
+                save_json(self.path + "timeline_home.json", self.timeline_home)
+                self.timeline_home = self._sort_timeline(load_json(self.path + "timeline_home.json"))
+            if timeline == "local":
+                self.timeline_local = self.mastodon.timeline(timeline=timeline)
+                save_json(self.path + "timeline_local.json", self.timeline_local)
+                self.timeline_local = self._sort_timeline(load_json(self.path + "timeline_local.json"))
+            if timeline == "public":
+                self.timeline_public = self.mastodon.timeline(timeline=timeline)
+                save_json(self.path + "timeline_public.json", self.timeline_public)
+                self.timeline_public = self._sort_timeline(load_json(self.path + "timeline_public.json"))
+
+    def _sort_timeline(self, timeline):
+        """
+            Function to sort the timeline by created_at
+        """
+        createdList = []
+        for toot in timeline:
+            createdList.append(toot["created_at"].split(".")[0])
+
+        _, timeline = (list(x) for x in zip(*sorted(zip(createdList, timeline), key=lambda pair: pair[0])))
+
+        return timeline
 
     def _clear_cache_folder(self):
         """
@@ -112,16 +138,33 @@ class mastobot:
 
         app.run(debug=True)
 
-    def _get_timeline(self, timeline=""):
+    def _convert_to_markdown(self, toots):
         """
-            Create markdown from local timeline
+            Function to convert timeline dicts to nice markdown
+            Markdown Toot Template setup:
+
+            ------------------------  ["account"]["username"]
+            |["account"]["avatar"] |  ["account"]["url"]
+            ------------------------
+            ["content"]
+            ["created_at"] ["replies_count"] ["reblogs_count"] ["reblogs_count"]
+            ["url"]
         """
-        if timeline == "local":
-            return self.timeline_local[-1]["content"]
-        if timeline == "home":
-            return self.timeline_home[-1]["content"]
-        if timeline == "public":
-            return self.timeline_public[-1]["content"]
+        output = ""
+        for toot in toots:
+            output += f"""
+-------------------------------------------------------------------------------
+{toot["content"]}
+User: {toot["account"]["username"]} Created: {toot["created_at"].split(".")[0]}  ↩️ {toot["replies_count"]}  🔄 {toot["reblogs_count"]}  ⭐️ {toot["favourites_count"]}
+"""
+            for i, media in enumerate(toot["media_attachments"]):
+                output += f"""
+Media{i}: {media["preview_url"]}
+"""
+            output += f"""[toot link]({toot["url"]})
+-------------------------------------------------------------------------------
+"""
+        return output
 
     def run(self):
         """
@@ -167,7 +210,7 @@ class mastobot:
             if match.is_not_from_this_bot() and match.prefix() and match.command("local"):
                 await self.mastobot.api.send_markdown_message(
                     room.room_id, 
-                    self._get_timeline("local")
+                    self._convert_to_markdown(self.timeline_local)
                 )
 
         # get home mastodon timeline
@@ -177,7 +220,7 @@ class mastobot:
             if match.is_not_from_this_bot() and match.prefix() and match.command("home"):
                 await self.mastobot.api.send_markdown_message(
                     room.room_id, 
-                    self._get_timeline("home")
+                    self._convert_to_markdown(self.timeline_home)
                 )
 
         # get public mastodon timeline
@@ -187,7 +230,7 @@ class mastobot:
             if match.is_not_from_this_bot() and match.prefix() and match.command("public"):
                 await self.mastobot.api.send_markdown_message(
                     room.room_id, 
-                    self._get_timeline("public")
+                    self._convert_to_markdown(self.timeline_public)
                 )
 
         # reload mastodon timelines

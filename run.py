@@ -12,7 +12,7 @@ mastobot = mastobot(config)
 # connect to mastodon
 mastobot.connect_mastodon()
 
-# load local timelines
+# load timelines
 mastobot.load_timelines()
 
 # setup flask server for testing without matrix
