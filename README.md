@@ -30,6 +30,7 @@ The main idea is to create a mastodon integration of the timeline via a Matrix B
     - [] Installation dokumentation
 
 - Tests / Error handling:
+    - [x] Static code analysis with pylint
     - [] Unit tests
     - [] Simple error handling for connections
 
