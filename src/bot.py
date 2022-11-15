@@ -277,13 +277,9 @@ Media{i}: {media["preview_url"]}
             """
             match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("echo"):
-                print(f"Room: {room.room_id}, \
-                        User: {str(message).split(':', maxsplit=None)[0]}, \
-                        Message: {str(message).split(':', maxsplit=None)[-1].strip()}"
-                )
                 await self.mastobot.api.send_text_message(
-                    room.room_id,
-                    " ".join(arg for arg in match.args())
+                        room.room_id,
+                        " ".join(arg for arg in match.args())
                 )
 
         # run the bot
