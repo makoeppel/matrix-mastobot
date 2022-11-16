@@ -3,6 +3,9 @@
 """
 
 import os
+import asyncio
+import threading
+import time
 import simplematrixbotlib as botlib
 
 from mastodon import Mastodon
@@ -281,6 +284,20 @@ Media{i}: {media["preview_url"]}
                         room.room_id,
                         " ".join(arg for arg in match.args())
                 )
+
+        # start cronjob for each room
+        @self.mastobot.listener.on_startup
+        async def start_cron_job(room_id):
+            def cron_job(room_id):
+                while True:
+                    print(room_id)
+                    #await self.mastobot.api.send_text_message(
+                    #    room_id,
+                    #    "I am a cron job."
+                    #)
+                    time.sleep(5) #asyncio.sleep(5)
+            thread = threading.Thread(target=cron_job, args=(room_id,), daemon=True)
+            thread.start()
 
         # run the bot
         self.mastobot.run()
