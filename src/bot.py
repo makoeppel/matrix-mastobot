@@ -226,6 +226,7 @@ Media{i}: {media["preview_url"]}
                 - !home your home mastodon timeline
                 - !public your public mastodon timeline
                 - !reload load your current timeline
+                - !cron start cron jobs to reaload timeline
                 """
                 await self.mastobot.api.send_markdown_message(room.room_id, help_message)
 
@@ -285,19 +286,23 @@ Media{i}: {media["preview_url"]}
                         " ".join(arg for arg in match.args())
                 )
 
-        # start cronjob for each room
-        @self.mastobot.listener.on_startup
-        async def start_cron_job(room_id):
-            def cron_job(room_id):
-                while True:
-                    print(room_id)
-                    #await self.mastobot.api.send_text_message(
-                    #    room_id,
-                    #    "I am a cron job."
-                    #)
-                    time.sleep(5) #asyncio.sleep(5)
-            thread = threading.Thread(target=cron_job, args=(room_id,), daemon=True)
-            thread.start()
+        # create run job function which runs in a second thread
+        @self.mastobot.listener.on_message_event
+        async def reload(room, message):
+            match = botlib.MessageMatch(room, message, self.mastobot, prefix)
+            if match.is_not_from_this_bot() and match.prefix() and match.command("cron"):
+                def run_cronbot():
+                    async def cron_job():
+                        api = botlib.Api(creds, config)
+                        await api.login()
+                        async_client = api.async_client
+                        await async_client.sync(timeout=65536, full_state=False)
+                        while True:
+                            await api.send_text_message(room.room_id, "I am a cron job.")
+                            time.sleep(5)
+                    asyncio.run(cron_job())
+                thread = threading.Thread(target=run_cronbot, daemon=True)
+                thread.start()
 
         # run the bot
         self.mastobot.run()
