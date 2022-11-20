@@ -88,11 +88,18 @@ class Mastobot:
             save_json(self.path + f"timeline_{timeline}.json", self.timeline_home)
         if os.path.exists(self.path + f"timeline_{timeline}.json"):
             self.timeline_home = {}
+            self.timeline_local = {}
+            self.timeline_public = {}
             loaded_timeline = load_json(self.path + f"timeline_{timeline}.json")
             for toot in curTimeline:
                 if toot["created_at"].strftime('%Y/%m/%d %H:%M:%S') not in loaded_timeline:
                     loaded_timeline[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
-                    self.timeline_home[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
+                    if timeline == "home":
+                        self.timeline_home[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
+                    if timeline == "local":
+                        self.timeline_local[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
+                    if timeline == "public":
+                        self.timeline_public[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
             save_json(self.path + f"timeline_{timeline}.json", loaded_timeline)
 
     def load_timelines(self, timeline=""):
