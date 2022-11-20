@@ -68,59 +68,50 @@ class Mastobot:
             to_file = self.config["mastodon-user"]["token"]
         )
 
-    def load_timelines(self, timeline="", reload=False):
+    def load_timeline(self, timeline=""):
+        """
+            load a specific timeline from mastodon, load the local
+            stored timeline, check if we have new toots if so store them
+            in self.timeline_NAME variable
+        """
+        if timeline == "home":
+            curTimeline = self.mastodon.timeline_home()
+        if timeline == "local":
+            curTimeline = self.mastodon.timeline_local()
+        if timeline == "public":
+            curTimeline = self.mastodon.timeline_public()
+
+        if not os.path.exists(self.path + f"timeline_{timeline}.json"):
+            self.timeline_home = {}
+            for toot in curTimeline:
+                self.timeline_home[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
+            save_json(self.path + f"timeline_{timeline}.json", self.timeline_home)
+        if os.path.exists(self.path + f"timeline_{timeline}.json"):
+            self.timeline_home = {}
+            loaded_timeline = load_json(self.path + f"timeline_{timeline}.json")
+            for toot in curTimeline:
+                if toot["created_at"].strftime('%Y/%m/%d %H:%M:%S') not in loaded_timeline:
+                    loaded_timeline[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
+                    self.timeline_home[toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')] = toot
+            save_json(self.path + f"timeline_{timeline}.json", loaded_timeline)
+
+    def load_timelines(self, timeline=""):
         """
             load all timelines (most recent ones first).
             The function can load the 'home', 'local', 'public'
             timesline via "" into the class attributes or return a
             specific one using 'home', 'local', 'public', 'tag/hashtag' or 'list/id'
         """
+        self._log_in()
+
         # load all timelines and store in the class
         if timeline == "":
-            # handle home timeline
-            if not os.path.exists(self.path + "timeline_home.json") or reload:
-                self._log_in()
-                self.timeline_home = self.mastodon.timeline_home()
-                save_json(self.path + "timeline_home.json", self.timeline_home)
-            self.timeline_home = self._sort_timeline(load_json(self.path + "timeline_home.json"))
-
-            # handle local timeline
-            if not os.path.exists(self.path + "timeline_local.json") or reload:
-                self._log_in()
-                self.timeline_local = self.mastodon.timeline_local()
-                save_json(self.path + "timeline_local.json", self.timeline_local)
-            self.timeline_local = self._sort_timeline(load_json(self.path + "timeline_local.json"))
-
-            # handle public timeline
-            if not os.path.exists(self.path + "timeline_public.json") or reload:
-                self._log_in()
-                self.timeline_public = self.mastodon.timeline_public()
-                save_json(self.path + "timeline_public.json", self.timeline_public)
-            self.timeline_public = self._sort_timeline(
-                load_json(self.path + "timeline_public.json")
-            )
+            for name in ["home", "local", "public"]:
+                self.load_timeline(name)
 
         # load a specific timeline
         if timeline != "":
-            self._log_in()
-            if timeline == "home":
-                self.timeline_home = self.mastodon.timeline(timeline=timeline)
-                save_json(self.path + "timeline_home.json", self.timeline_home)
-                self.timeline_home = self._sort_timeline(
-                    load_json(self.path + "timeline_home.json")
-                )
-            if timeline == "local":
-                self.timeline_local = self.mastodon.timeline(timeline=timeline)
-                save_json(self.path + "timeline_local.json", self.timeline_local)
-                self.timeline_local = self._sort_timeline(
-                    load_json(self.path + "timeline_local.json")
-                )
-            if timeline == "public":
-                self.timeline_public = self.mastodon.timeline(timeline=timeline)
-                save_json(self.path + "timeline_public.json", self.timeline_public)
-                self.timeline_public = self._sort_timeline(
-                    load_json(self.path + "timeline_public.json")
-                )
+            self.load_timeline(timeline)
 
     def _sort_timeline(self, timeline):
         """
@@ -128,7 +119,7 @@ class Mastobot:
         """
         created_list = []
         for toot in timeline:
-            created_list.append(toot["created_at"].split(".")[0])
+            created_list.append(toot["created_at"].strftime('%Y/%m/%d %H:%M:%S'))
 
         _, timeline = (list(x) for x in zip(*sorted(
             zip(created_list, timeline),
@@ -177,11 +168,11 @@ class Mastobot:
             ["url"]
         """
         output = ""
-        for toot in toots:
+        for toot in toots.values():
             output += f"""
 -------------------------------------------------------------------------------
 {toot["content"]}
-User: {toot["account"]["username"]} Created: {toot["created_at"].split(".")[0]}  ↩️ {toot["replies_count"]}  🔄 {toot["reblogs_count"]}  ⭐️ {toot["favourites_count"]}
+User: {toot["account"]["username"]} Created: {toot["created_at"].strftime('%Y/%m/%d %H:%M:%S')}  ↩️ {toot["replies_count"]}  🔄 {toot["reblogs_count"]}  ⭐️ {toot["favourites_count"]}
 """
             for i, media in enumerate(toot["media_attachments"]):
                 output += f"""
@@ -235,37 +226,40 @@ Media{i}: {media["preview_url"]}
         async def local(room, message):
             match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("local"):
-                await self.mastobot.api.send_markdown_message(
-                    room.room_id,
-                    self._convert_to_markdown(self.timeline_local)
-                )
+                if len(self.timeline_local.keys()) > 0:
+                    await self.mastobot.api.send_markdown_message(
+                        room.room_id,
+                        self._convert_to_markdown(self.timeline_local)
+                    )
 
         # get home mastodon timeline
         @self.mastobot.listener.on_message_event
         async def home(room, message):
             match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("home"):
-                await self.mastobot.api.send_markdown_message(
-                    room.room_id,
-                    self._convert_to_markdown(self.timeline_home)
-                )
+                if len(self.timeline_home.keys()) > 0:
+                    await self.mastobot.api.send_markdown_message(
+                        room.room_id,
+                        self._convert_to_markdown(self.timeline_home)
+                    )
 
         # get public mastodon timeline
         @self.mastobot.listener.on_message_event
         async def public(room, message):
             match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("public"):
-                await self.mastobot.api.send_markdown_message(
-                    room.room_id,
-                    self._convert_to_markdown(self.timeline_public)
-                )
+                if len(self.timeline_public.keys()) > 0:
+                    await self.mastobot.api.send_markdown_message(
+                        room.room_id,
+                        self._convert_to_markdown(self.timeline_public)
+                    )
 
         # reload mastodon timelines
         @self.mastobot.listener.on_message_event
         async def reload(room, message):
             match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("reload"):
-                self.load_timelines(reload=True)
+                self.load_timelines()
                 await self.mastobot.api.send_text_message(
                     room.room_id, "I have reloaded your timelines for you."
                 )
@@ -288,17 +282,22 @@ Media{i}: {media["preview_url"]}
 
         # create run job function which runs in a second thread
         @self.mastobot.listener.on_message_event
-        async def reload(room, message):
+        async def cronjob(room, message):
             match = botlib.MessageMatch(room, message, self.mastobot, prefix)
             if match.is_not_from_this_bot() and match.prefix() and match.command("cron"):
                 def run_cronbot():
                     async def cron_job():
                         api = botlib.Api(creds, config)
-                        await api.login()
                         async_client = api.async_client
-                        await async_client.sync(timeout=65536, full_state=False)
                         while True:
-                            await api.send_text_message(room.room_id, "I am a cron job.")
+                            self.load_timelines()
+                            await api.login()
+                            await async_client.sync(timeout=65536, full_state=False)
+                            if len(self.timeline_home.keys()) > 0:
+                                await self.mastobot.api.send_markdown_message(
+                                    room.room_id,
+                                    self._convert_to_markdown(self.timeline_home)
+                                )
                             time.sleep(5)
                     asyncio.run(cron_job())
                 thread = threading.Thread(target=run_cronbot, daemon=True)
