@@ -288,17 +288,18 @@ Media{i}: {media["preview_url"]}
                 def run_cronbot():
                     async def cron_job():
                         api = botlib.Api(creds, config)
+                        await api.login()
                         async_client = api.async_client
                         while True:
                             self.load_timelines()
                             await api.login()
                             await async_client.sync(timeout=65536, full_state=False)
                             if len(self.timeline_home.keys()) > 0:
-                                await self.mastobot.api.send_markdown_message(
+                                await api.send_markdown_message(
                                     room.room_id,
                                     self._convert_to_markdown(self.timeline_home)
                                 )
-                            time.sleep(5)
+                            time.sleep(60)
                     asyncio.run(cron_job())
                 thread = threading.Thread(target=run_cronbot, daemon=True)
                 thread.start()
